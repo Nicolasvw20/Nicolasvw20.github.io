@@ -1,0 +1,74 @@
+  function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderAll() {
+    renderDateStrip(); renderDashboard(); renderWorkout(); renderMobility(); renderRunning(); renderProgress(); renderSettings(); renderTimer();
+  }
+
+  function renderDateStrip() {
+    const week = mondayOf(selectedDate);
+    $('dateStrip').innerHTML = '';
+    for (let i=0;i<7;i++) {
+      const value = addDays(week,i), d = parseDate(value), session = sessionFor(value);
+      const button = document.createElement('button');
+      button.className = `day${value===selectedDate?' active':''}`;
+      button.innerHTML = `<b>${d.toLocaleDateString('en-GB',{weekday:'short'})}</b><span>${d.getDate()}</span><small>${session.title.split(' ')[0]}</small>`;
+      button.addEventListener('click', () => { selectedDate=value; renderAll(); });
+      $('dateStrip').appendChild(button);
+    }
+  }
+
+  function completionFor(date) {
+    const session = sessionFor(date); let done=0;
+    session.blocks.forEach((_,i)=>{ if(getLog(date,i).done) done++; });
+    return { done, total: session.blocks.length, percent: session.blocks.length ? Math.round(done/session.blocks.length*100) : 0 };
+  }
+
+  function renderDashboard() {
+    const session = sessionFor(selectedDate), progress = completionFor(selectedDate), week = mondayOf(selectedDate);
+    $('sessionTitle').textContent = session.title;
+    $('sessionSummary').textContent = session.subtitle;
+    $('sessionDuration').textContent = session.duration === 60 ? '≤ 60 min' : `≤ ${session.duration} min`;
+    $('dayPercent').textContent = `${progress.percent}%`;
+    $('dayFill').style.width = `${progress.percent}%`;
+    $('clearanceAlert').style.display = state.settings.clearance === 'not-cleared' ? 'block' : 'none';
+
+    const gymDays = [0,1,3,5].map(i=>addDays(week,i));
+    const completedSessions = gymDays.filter(date=>completionFor(date).percent===100).length;
+    $('weekSessions').textContent = `${completedSessions} / 4`;
+    let cardio = 0;
+    for(let i=0;i<7;i++) cardio += Number((state.cardio[addDays(week,i)]||{}).minutes||0);
+    $('weekCardio').textContent = `${cardio} min`;
+    $('runStatus').textContent = state.run.unlocked ? `Phase ${state.run.phase+1}` : 'Locked';
+
+    const timerActiveToday = state.timer.date === selectedDate && (state.timer.running || state.timer.elapsed > 0);
+    $('startSession').textContent = timerActiveToday ? 'Resume session timer' : `Start ${session.duration}-min session`;
+    $('startSession').onclick = () => startOrResumeTimer(session.duration);
+    $('jumpToday').onclick = () => { selectedDate=localDate(new Date()); renderAll(); };
+  }
+
+  function renderWorkout() {
+    const session = sessionFor(selectedDate);
+    $('blocksHeading').textContent = session.title;
+    $('blockCount').textContent = `${session.blocks.length} blocks`;
+    $('workoutBlocks').innerHTML = session.blocks.map((block,index)=>{
+      const log = getLog(selectedDate,index);
+      const showInputs = !['prep','log','cardio','mobility'].includes(block.type);
+      return `<article class="card block ${log.done?'completed':''}">
+        <div class="block-head">
+          <div class="block-time">${block.time}<br><small>MIN</small></div>
+          <div><div class="block-name">${escapeHtml(block.name)}</div><div class="block-detail">${escapeHtml(block.detail)}</div></div>
+          <button class="check-btn ${log.done?'done':''}" data-check="${index}" aria-label="Mark complete">${log.done?'✓':'○'}</button>
+        </div>
+        ${showInputs?`<div class="inputs">
+          <div class="field"><label>Load kg</label><input data-log="load" data-index="${index}" value="${escapeHtml(log.load)}" inputmode="decimal"></div>
+          <div class="field"><label>Best reps</label><input data-log="reps" data-index="${index}" value="${escapeHtml(log.reps)}" inputmode="numeric"></div>
+          <div class="field"><label>Pain 0–10</label><input data-log="pain" data-index="${index}" type="number" min="0" max="10" value="${escapeHtml(log.pain)}"></div>
+        </div>`:''}
+        <div class="field" style="margin-top:8px"><label>Notes</label><input data-log="notes" data-index="${index}" value="${escapeHtml(log.notes)}" placeholder="Technique, substitutions or symptoms"></div>
+      </article>`;
+    }).join('');
+
+    $('workoutBlocks').querySelectorAll('[data-check]').forEach(btn=>btn.onclick=()=>{
+      const log = getLog(selectedDate,Number(btn.dataset.check)); log.done=!log.done; saveState(); renderAll();
+    });
+    $('workoutBlocks').querySelectorAll('[data-log]').forEach(input=>input.onchange=()=>{

@@ -1,0 +1,12 @@
+{
+  "name": "Hip Rehab Daily Tracker",
+  "short_name": "Hip Rehab",
+  "description": "Daily dynamic hip screw rehabilitation tracker.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef4f1",
+  "theme_color": "#176b58",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

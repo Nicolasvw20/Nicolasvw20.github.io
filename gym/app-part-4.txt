@@ -1,0 +1,58 @@
+      getLog(selectedDate,Number(input.dataset.index))[input.dataset.log] = input.value; saveState(); renderDashboard(); renderProgress();
+    });
+
+    const cardio = state.cardio[selectedDate] || {};
+    $('cardioMinutes').value = cardio.minutes || '';
+    $('cardioIntensity').value = cardio.intensity || '';
+    $('cardioType').value = cardio.type || '';
+    $('saveCardio').onclick = () => {
+      state.cardio[selectedDate] = { minutes:Number($('cardioMinutes').value||0), intensity:$('cardioIntensity').value, type:$('cardioType').value };
+      saveState(); renderAll();
+    };
+  }
+
+  function renderMobility() {
+    $('mobilityList').innerHTML = MOBILITY.map((item,index)=>{
+      const key = `${selectedDate}|${index}`, done = !!state.mobility[key];
+      return `<div class="mobility-item"><button class="check-btn ${done?'done':''}" data-mobility="${index}">${done?'✓':index+1}</button><div><div class="block-name">${item[0]}</div><div class="block-detail">${item[1]}</div></div></div>`;
+    }).join('');
+    $('mobilityList').querySelectorAll('[data-mobility]').forEach(btn=>btn.onclick=()=>{
+      const key = `${selectedDate}|${btn.dataset.mobility}`; state.mobility[key]=!state.mobility[key]; saveState(); renderMobility();
+    });
+  }
+
+  function renderRunning() {
+    document.querySelectorAll('[data-gate]').forEach(box=>{
+      box.checked=!!state.run.gates[box.dataset.gate];
+      box.onchange=()=>{ state.run.gates[box.dataset.gate]=box.checked; saveState(); };
+    });
+    $('runGate').style.display = state.run.unlocked ? 'none' : 'block';
+    $('unlockRunning').onclick = () => {
+      const needed=['impact','walk','control','foot'];
+      if(!needed.every(k=>state.run.gates[k])) return alert('All four clinician-readiness checks need to be ticked first.');
+      state.run.unlocked=true; state.run.phase=0; state.run.stableSessions=0; saveState(); renderAll();
+    };
+    if(!state.run.unlocked) { $('runProgramme').innerHTML=''; return; }
+    const phase = state.run.phase;
+    $('runProgramme').innerHTML = `<div class="card block"><div class="section-head"><h3>Current phase: ${phase+1}</h3><span>Max 40 min including warm-up</span></div><div class="block-name">${RUN_PHASES[phase][0]}</div><div class="block-detail" style="font-size:.88rem;margin-top:5px">${RUN_PHASES[phase][1]}</div><p class="note">Run no more than twice weekly, with at least one rest day between. Count only sessions with no new limp, pain above 2/10, repeated toe-catching or next-day flare.</p><div class="inputs"><div class="field"><label>Stable sessions</label><input id="stableSessions" type="number" min="0" max="9" value="${state.run.stableSessions}"></div></div><div class="actions"><button class="primary" id="logStable">Log stable session</button><button class="secondary" id="advanceRun">Advance after 2</button><button class="danger" id="lockRun">Lock running</button></div></div>` + RUN_PHASES.map((p,i)=>`<div class="phase ${i===phase?'active':''} ${i>phase?'locked':''}"><b>Phase ${i+1}: ${p[0]}</b><span>${p[1]}</span></div>`).join('');
+    $('logStable').onclick=()=>{ state.run.stableSessions=Number($('stableSessions').value||0)+1; saveState(); renderRunning(); renderDashboard(); };
+    $('advanceRun').onclick=()=>{
+      if(state.run.stableSessions<2) return alert('Complete two stable sessions before progressing.');
+      if(state.run.phase<RUN_PHASES.length-1){ state.run.phase++; state.run.stableSessions=0; saveState(); renderAll(); }
+    };
+    $('lockRun').onclick=()=>{ state.run.unlocked=false; saveState(); renderAll(); };
+  }
+
+  function renderProgress() {
+    const week = mondayOf(selectedDate);
+    $('weeklyChart').innerHTML='';
+    for(let i=0;i<7;i++){
+      const date=addDays(week,i), d=parseDate(date), progress=completionFor(date);
+      $('weeklyChart').insertAdjacentHTML('beforeend',`<div class="chart-row"><span>${d.toLocaleDateString('en-GB',{weekday:'short'})}</span><div class="mini-track"><div class="mini-fill" style="width:${progress.percent}%"></div></div><b>${progress.percent}%</b></div>`);
+    }
+    const schedule=[['Monday','Push Strength','Chest, shoulders and triceps · 60 min'],['Tuesday','Pull + Arms','Back, biceps and run-prep control · 60 min'],['Wednesday','Cardio + Mobility','Easy aerobic base · 30–45 min'],['Thursday','Legs Strength','Primary lower-body session · 60 min'],['Friday','Recovery Cardio','Easy cycling/walking + mobility · 30–45 min'],['Saturday','PPL Performance','Second legs/chest/arms exposure · 60 min'],['Sunday','Rest / Reset','Rest or 10–15 min mobility']];
+    $('scheduleGrid').innerHTML=schedule.map(x=>`<div class="card schedule-card"><div class="day-label">${x[0]}</div><b>${x[1]}</b><span>${x[2]}</span></div>`).join('');
+    $('exportData').onclick=exportCsv;
+  }
+
+  function renderSettings() {

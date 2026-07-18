@@ -1,0 +1,81 @@
+    $('clearance').value=state.settings.clearance;
+    $('cardioTarget').value=state.settings.cardioTarget;
+    $('deload').value=state.settings.deload;
+    $('clinicianNotes').value=state.settings.clinicianNotes;
+    $('saveSettings').onclick=()=>{
+      state.settings={clearance:$('clearance').value,cardioTarget:Number($('cardioTarget').value||0),deload:$('deload').value,clinicianNotes:$('clinicianNotes').value};
+      if(state.settings.clearance==='impact') state.run.gates.impact=true;
+      saveState(); renderAll();
+    };
+    $('installApp').onclick=promptInstall;
+    $('installTop').onclick=promptInstall;
+    $('clearData').onclick=()=>{ if(confirm('Delete all Form Performance records from this device?')){ localStorage.removeItem(STORAGE_KEY); state=defaultState(); stopTimer(true); renderAll(); } };
+  }
+
+  function startOrResumeTimer(durationMinutes) {
+    if(state.timer.date!==selectedDate){ state.timer={date:selectedDate,startedAt:Date.now(),elapsed:0,running:true,duration:durationMinutes*60}; }
+    else if(!state.timer.running){ state.timer.startedAt=Date.now(); state.timer.running=true; state.timer.duration=durationMinutes*60; }
+    saveState(); startTimerInterval(); renderTimer();
+  }
+
+  function currentElapsed() {
+    if(!state.timer.running) return state.timer.elapsed||0;
+    return (state.timer.elapsed||0)+Math.floor((Date.now()-state.timer.startedAt)/1000);
+  }
+
+  function startTimerInterval() { clearInterval(sessionTimer); sessionTimer=setInterval(renderTimer,1000); }
+  function renderTimer() {
+    const shell=$('timerShell');
+    if(!state.timer.date || (!state.timer.running && !state.timer.elapsed)){ shell.classList.remove('active'); return; }
+    shell.classList.add('active');
+    const elapsed=currentElapsed(), target=state.timer.duration||MAX_SESSION_SECONDS;
+    const mins=Math.floor(elapsed/60), secs=elapsed%60;
+    $('timerTime').textContent=`${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    $('timerMeta').textContent=elapsed>target?`${Math.ceil((elapsed-target)/60)} min over cap`:`${Math.ceil((target-elapsed)/60)} min remaining`;
+    $('timerTime').classList.toggle('warning',elapsed>=target-300&&elapsed<=target);
+    $('timerTime').classList.toggle('over',elapsed>target);
+    $('pauseTimer').textContent=state.timer.running?'Pause':'Resume';
+    $('pauseTimer').onclick=()=>{
+      if(state.timer.running){ state.timer.elapsed=currentElapsed(); state.timer.running=false; state.timer.startedAt=null; clearInterval(sessionTimer); }
+      else { state.timer.startedAt=Date.now(); state.timer.running=true; startTimerInterval(); }
+      saveState(); renderTimer();
+    };
+    $('finishTimer').onclick=()=>stopTimer(false);
+  }
+
+  function stopTimer(clearOnly) {
+    clearInterval(sessionTimer);
+    if(!clearOnly && state.timer.date){
+      const minutes=Math.round(currentElapsed()/60);
+      const existing=state.cardio[state.timer.date]||{};
+      existing.sessionMinutes=minutes;
+      state.cardio[state.timer.date]=existing;
+    }
+    state.timer={date:null,startedAt:null,elapsed:0,running:false}; saveState(); renderAll();
+  }
+
+  function startRestTimer(seconds, button) {
+    clearInterval(restTimer); let remaining=seconds; button.classList.add('running');
+    const original=button.textContent;
+    button.textContent=formatShort(remaining);
+    restTimer=setInterval(()=>{ remaining--; button.textContent=formatShort(remaining); if(remaining<=0){clearInterval(restTimer);button.classList.remove('running');button.textContent=original;navigator.vibrate?.([150,80,150]);}},1000);
+  }
+  function formatShort(seconds){return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;}
+
+  function exportCsv() {
+    const rows=[['Date','Session','Block','Completed','Load kg','Reps','Pain','Notes','Cardio minutes','Cardio type','Intensity']];
+    Object.entries(state.logs).forEach(([key,log])=>{
+      const [date,index]=key.split('|'), session=sessionFor(date), block=session.blocks[Number(index)]||{};
+      const cardio=state.cardio[date]||{};
+      rows.push([date,session.title,block.name||'',log.done?'Yes':'No',log.load,log.reps,log.pain,log.notes,cardio.minutes||'',cardio.type||'',cardio.intensity||'']);
+    });
+    const csv=rows.map(row=>row.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='form-performance-training-log.csv'; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  function setView(view) {
+    activeView=view;
+    document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===view));
+    document.querySelectorAll('[data-view]').forEach(btn=>btn.classList.toggle('active',btn.dataset.view===view));
+  }
+

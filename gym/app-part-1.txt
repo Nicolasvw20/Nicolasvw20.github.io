@@ -1,0 +1,62 @@
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const STORAGE_KEY = 'form-performance-v2';
+  const LEGACY_KEY = 'ppl-gym-v1';
+  const MAX_SESSION_SECONDS = 60 * 60;
+
+  const SESSIONS = {
+    1: {
+      key: 'push', title: 'Push Strength', subtitle: 'Chest priority · shoulders · triceps', duration: 60,
+      blocks: [
+        { time: '0–7', name: 'Warm-up', detail: '3 min easy bike · band external rotation 1×15 · pull-aparts 1×15 · scapular push-ups 1×10 · 2 light bench sets', type: 'prep' },
+        { time: '7–21', name: 'Barbell bench press', detail: '4 × 4–6 · rest 2–2½ min', sets: '4', reps: '4–6' },
+        { time: '21–32', name: 'Incline dumbbell press', detail: '3 × 6–10 · rest 90–120 sec', sets: '3', reps: '6–10' },
+        { time: '32–42', name: 'Seated shoulder press', detail: '3 × 6–10 · rest 90 sec', sets: '3', reps: '6–10' },
+        { time: '42–51', name: 'Chest + shoulders superset', detail: 'Cable fly 3×10–15 + lateral raise 3×12–20 · rest 60 sec', sets: '3', reps: '10–20' },
+        { time: '51–59', name: 'Triceps superset', detail: 'Pressdown 3×8–12 + overhead extension 3×10–15 · rest 45–60 sec', sets: '3', reps: '8–15' },
+        { time: '59–60', name: 'Log session', detail: 'Record load, reps, pain and any technique notes', type: 'log' }
+      ]
+    },
+    2: {
+      key: 'pull', title: 'Pull + Arms', subtitle: 'Back strength · biceps · run preparation', duration: 60,
+      blocks: [
+        { time: '0–7', name: 'Warm-up', detail: '3 min easy bike/row · open-books 5/side · pull-aparts 1×15 · light row and pulldown', type: 'prep' },
+        { time: '7–20', name: 'Chest-supported row', detail: '4 × 5–8 · rest 2 min', sets: '4', reps: '5–8' },
+        { time: '20–31', name: 'Neutral-grip pulldown', detail: '3 × 6–10 · rest 90–120 sec', sets: '3', reps: '6–10' },
+        { time: '31–40', name: 'Single-arm cable row', detail: '3 × 8–12/side · rest 60 sec after both arms', sets: '3', reps: '8–12' },
+        { time: '40–47', name: 'Reverse cable fly', detail: '3 × 12–20 · rest 60 sec', sets: '3', reps: '12–20' },
+        { time: '47–56', name: 'Biceps superset', detail: 'EZ-bar curl 3×6–10 + hammer curl 3×10–15 · rest 60 sec', sets: '3', reps: '6–15' },
+        { time: '56–60', name: 'Supported run-prep control', detail: 'Choose physio-approved step-down, step-up, sit-to-stand or balance · 2×5–8/side', sets: '2', reps: '5–8' }
+      ]
+    },
+    3: {
+      key: 'cardio1', title: 'Cardio + Mobility', subtitle: 'Easy aerobic base · recovery quality', duration: 45,
+      blocks: [
+        { time: '0–35', name: 'Easy cycling or cycle commute', detail: '30–35 min at conversational pace', type: 'cardio' },
+        { time: '35–45', name: 'Move mobility block', detail: 'Big toe · ankle rocks · 90/90 · hip flexor · open-book · calf isometric', type: 'mobility' }
+      ]
+    },
+    4: {
+      key: 'legs', title: 'Legs Strength', subtitle: 'Primary lower-body strength day', duration: 60,
+      blocks: [
+        { time: '0–9', name: 'Lower-body warm-up', detail: '3 min bike · toe mobility · ankle rocks · 90/90 · supported hinge · 2 light first-exercise sets', type: 'prep' },
+        { time: '9–22', name: 'Safety-bar squat or leg press', detail: '4 × 5–8 · rest 2 min · choose the best-controlled option', sets: '4', reps: '5–8' },
+        { time: '22–34', name: 'Romanian deadlift', detail: '4 × 6–8 · rest 90–120 sec', sets: '4', reps: '6–8' },
+        { time: '34–45', name: 'Supported split squat', detail: '3 × 6–10/leg · weaker side first · rest 60 sec after both sides', sets: '3', reps: '6–10' },
+        { time: '45–52', name: 'Knee extension + leg curl', detail: '2 rounds · single-leg extension 10–15 + single-leg curl 10–15', sets: '2', reps: '10–15' },
+        { time: '52–59', name: 'Calf + tibialis superset', detail: '3 rounds · seated calf 8–15 + tibialis/dorsiflexion 15–20', sets: '3', reps: '8–20' },
+        { time: '59–60', name: 'Gait and symptom check', detail: 'Record pain, loads and whether walking still feels normal', type: 'log' }
+      ]
+    },
+    5: {
+      key: 'cardio2', title: 'Recovery Cardio', subtitle: 'Easy cycling or brisk walking · no fatigue chasing', duration: 45,
+      blocks: [
+        { time: '0–35', name: 'Easy recovery cardio', detail: '25–35 min easy cycling, or brisk walking once cleared', type: 'cardio' },
+        { time: '35–45', name: 'Move mobility block', detail: '10 min controlled mobility; keep this day genuinely easy', type: 'mobility' }
+      ]
+    },
+    6: {
+      key: 'performance', title: 'PPL Performance', subtitle: 'Second legs · chest · back · arms exposure', duration: 60,
+      blocks: [

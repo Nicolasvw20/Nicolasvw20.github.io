@@ -1,0 +1,92 @@
+        { time: '0–7', name: 'Warm-up', detail: '3 min bike · ankle rocks · hip switches · band shoulder activation · light hip thrust', type: 'prep' },
+        { time: '7–18', name: 'Hip thrust', detail: '4 × 6–10 · rest 90 sec', sets: '4', reps: '6–10' },
+        { time: '18–28', name: 'Supported step-up', detail: '3 × 8/leg · weaker side first · controlled lowering', sets: '3', reps: '8' },
+        { time: '28–40', name: 'Incline press', detail: '4 × 6–8 · rest 90–120 sec', sets: '4', reps: '6–8' },
+        { time: '40–49', name: 'Pull-up or pulldown', detail: '3 × 6–10 · rest 90 sec', sets: '3', reps: '6–10' },
+        { time: '49–55', name: 'Hamstrings + shoulders', detail: '2–3 rounds · seated curl 10–15 + lateral raise 15–20', sets: '2–3', reps: '10–20' },
+        { time: '55–60', name: 'Arms superset', detail: '2 rounds · curl 10–15 + cable pressdown 10–15 · rest 45 sec', sets: '2', reps: '10–15' }
+      ]
+    },
+    0: {
+      key: 'rest', title: 'Rest / Reset', subtitle: 'Full recovery or a short mobility reset', duration: 15,
+      blocks: [
+        { time: '0–10', name: 'Optional mobility reset', detail: 'Easy controlled range only', type: 'mobility' },
+        { time: '10–15', name: 'Plan the week', detail: 'Review symptoms, training loads and the coming schedule', type: 'log' }
+      ]
+    }
+  };
+
+  const MOBILITY = [
+    ['Easy bike or brisk walk', '3–5 minutes'],
+    ['Big-toe / first-ray mobility', '45–60 sec each side'],
+    ['Knee-to-wall ankle rocks', '2 × 8 each side'],
+    ['90/90 hip switches', '2 × 6'],
+    ['Supported hip-airplane or hinge reach', '2 × 5 each side'],
+    ['Hip-flexor stretch', '30–45 sec each side'],
+    ['Open-book thoracic rotation', '5–6 each side'],
+    ['Band shoulder activation', '1–2 × 12–15'],
+    ['Calf isometric hold', '2 × 20 sec']
+  ];
+
+  const RUN_PHASES = [
+    ['Walk–jog introduction', '6 × (30 sec jog + 90 sec walk)'],
+    ['Longer jog intervals', '6 × (60 sec jog + 90 sec walk)'],
+    ['Equal intervals', '8 × (60 sec jog + 60 sec walk)'],
+    ['Two-minute efforts', '6 × (2 min jog + 1 min walk)'],
+    ['Four-minute efforts', '4 × (4 min jog + 1 min walk)'],
+    ['Continuous easy jog', '20 minutes easy'],
+    ['Build durability', '25–30 minutes easy; increase duration before speed']
+  ];
+
+  let state = loadState();
+  let selectedDate = localDate(new Date());
+  let activeView = 'today';
+  let sessionTimer = null;
+  let restTimer = null;
+  let deferredInstall = null;
+
+  function defaultState() {
+    return {
+      version: 2,
+      settings: { clearance: 'not-cleared', cardioTarget: 120, deload: '4', clinicianNotes: '' },
+      logs: {}, cardio: {}, mobility: {}, run: { unlocked: false, phase: 0, stableSessions: 0, gates: {} },
+      timer: { date: null, startedAt: null, elapsed: 0, running: false }
+    };
+  }
+
+  function loadState() {
+    const base = defaultState();
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      if (saved) return deepMerge(base, saved);
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+      if (legacy) {
+        base.settings.clearance = legacy.clearance === 'impact' ? 'impact' : legacy.clearance === 'gym' ? 'gym' : 'not-cleared';
+        base.settings.cardioTarget = Number(legacy.target || 120);
+        base.settings.clinicianNotes = legacy.notes || '';
+      }
+    } catch (_) {}
+    return base;
+  }
+
+  function deepMerge(target, source) {
+    Object.keys(source || {}).forEach((key) => {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        target[key] = deepMerge(target[key] || {}, source[key]);
+      } else target[key] = source[key];
+    });
+    return target;
+  }
+
+  function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  function localDate(date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
+  function parseDate(value) { const [y,m,d] = value.split('-').map(Number); return new Date(y,m-1,d); }
+  function addDays(value, amount) { const d = parseDate(value); d.setDate(d.getDate()+amount); return localDate(d); }
+  function mondayOf(value) { const d = parseDate(value); d.setDate(d.getDate()-((d.getDay()+6)%7)); return localDate(d); }
+  function sessionFor(value) { return SESSIONS[parseDate(value).getDay()]; }
+  function logKey(date, blockIndex) { return `${date}|${blockIndex}`; }
+  function getLog(date, blockIndex) {
+    const key = logKey(date, blockIndex);
+    if (!state.logs[key]) state.logs[key] = { done:false, load:'', reps:'', pain:'', notes:'' };
+    return state.logs[key];
+  }

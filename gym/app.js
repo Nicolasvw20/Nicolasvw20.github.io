@@ -1,5 +1,8 @@
 (async()=>{
   try{
+    const style=document.createElement('style');
+    style.textContent='@media(max-width:680px){.bottom-nav.mobile-only{display:flex}}';
+    document.head.appendChild(style);
     const files=['app-part-1.txt','app-part-2.txt','app-part-3.txt','app-part-4.txt','app-part-5.txt','app-part-6.txt'];
     const parts=await Promise.all(files.map(async file=>{
       const response=await fetch(file,{cache:'no-cache'});

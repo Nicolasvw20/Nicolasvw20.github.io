@@ -1,0 +1,20 @@
+  async function promptInstall() {
+    if(deferredInstall){ deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall=null; }
+    else alert('iPhone: open in Safari → Share → Add to Home Screen. Android: open in Chrome → menu → Install app.');
+  }
+
+  document.querySelectorAll('[data-view]').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.view)));
+  window.addEventListener('beforeinstallprompt',(event)=>{ event.preventDefault(); deferredInstall=event; });
+  window.addEventListener('load',()=>{
+    document.querySelectorAll('.block').forEach(()=>{});
+    if(state.timer.running) startTimerInterval();
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+
+  // Add rest timer controls to workout view through event delegation-friendly static row.
+  const restRow=document.createElement('div'); restRow.className='rest-row'; restRow.innerHTML='<button data-rest="60">Rest 60s</button><button data-rest="90">Rest 90s</button><button data-rest="120">Rest 2 min</button><button data-rest="150">Rest 2½ min</button>';
+  $('blocksHeading').parentElement.insertAdjacentElement('afterend',restRow);
+  restRow.querySelectorAll('[data-rest]').forEach(btn=>btn.onclick=()=>startRestTimer(Number(btn.dataset.rest),btn));
+
+  renderAll();
+})();
